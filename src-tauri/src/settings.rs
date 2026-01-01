@@ -396,6 +396,11 @@ fn default_post_process_providers() -> Vec<PostProcessProvider> {
             base_url: "https://api.cerebras.ai/v1".to_string(),
         },
         PostProcessProvider {
+            id: "google".to_string(),
+            label: "Google".to_string(),
+            base_url: "https://generativelanguage.googleapis.com/v1beta/openai".to_string(),
+        },
+        PostProcessProvider {
             id: "custom".to_string(),
             label: "Custom".to_string(),
             base_url: "http://localhost:11434/v1".to_string(),
