@@ -97,6 +97,10 @@ pub struct PostProcessProvider {
     pub id: String,
     pub label: String,
     pub base_url: String,
+    #[serde(default)]
+    pub allow_base_url_edit: bool,
+    #[serde(default)]
+    pub models_endpoint: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type)]
@@ -374,36 +378,64 @@ fn default_post_process_providers() -> Vec<PostProcessProvider> {
             id: "openai".to_string(),
             label: "OpenAI".to_string(),
             base_url: "https://api.openai.com/v1".to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: None,
         },
         PostProcessProvider {
             id: "openrouter".to_string(),
             label: "OpenRouter".to_string(),
             base_url: "https://openrouter.ai/api/v1".to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: None,
         },
         PostProcessProvider {
             id: "anthropic".to_string(),
             label: "Anthropic".to_string(),
             base_url: "https://api.anthropic.com/v1".to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: None,
         },
         PostProcessProvider {
             id: "groq".to_string(),
             label: "Groq".to_string(),
             base_url: "https://api.groq.com/openai/v1".to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: None,
         },
         PostProcessProvider {
             id: "cerebras".to_string(),
             label: "Cerebras".to_string(),
             base_url: "https://api.cerebras.ai/v1".to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: None,
+        },
+        PostProcessProvider {
+            id: "apple_intelligence".to_string(),
+            label: "Apple Intelligence".to_string(),
+            base_url: "".to_string(), // Placeholder, not used for http requests directly usually
+            allow_base_url_edit: true,
+            models_endpoint: None,
+        },
+        PostProcessProvider {
+            id: "local_llama".to_string(),
+            label: "Local Llama".to_string(),
+            base_url: "http://localhost:8080/v1".to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: None,
         },
         PostProcessProvider {
             id: "google".to_string(),
             label: "Google".to_string(),
             base_url: "https://generativelanguage.googleapis.com/v1beta/openai".to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: None,
         },
         PostProcessProvider {
             id: "custom".to_string(),
-            label: "Custom".to_string(),
-            base_url: "http://localhost:11434/v1".to_string(),
+            label: "Custom (OpenAI Specific)".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            allow_base_url_edit: true,
+            models_endpoint: None,
         },
     ];
 
@@ -457,7 +489,10 @@ fn default_post_process_prompts() -> Vec<LLMPrompt> {
 
 fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
     let mut changed = false;
-    for provider in default_post_process_providers() {
+    let default_providers = default_post_process_providers();
+
+    // First, add any missing providers
+    for provider in &default_providers {
         if settings
             .post_process_providers
             .iter()
@@ -486,6 +521,22 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
                 settings
                     .post_process_models
                     .insert(provider.id.clone(), default_model);
+                changed = true;
+            }
+        }
+    }
+
+    // Second, ensure existing default providers have correct configuration flags
+    for existing in settings.post_process_providers.iter_mut() {
+        if let Some(default) = default_providers.iter().find(|p| p.id == existing.id) {
+            // Always sync the allow_base_url_edit flag from code defaults
+            if existing.allow_base_url_edit != default.allow_base_url_edit {
+                existing.allow_base_url_edit = default.allow_base_url_edit;
+                changed = true;
+            }
+            // Always sync the label from code defaults (in case we rename something)
+            if existing.label != default.label {
+                existing.label = default.label.clone();
                 changed = true;
             }
         }

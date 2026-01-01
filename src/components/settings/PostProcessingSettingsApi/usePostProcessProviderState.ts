@@ -43,7 +43,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
     postProcessModelOptions,
   } = useSettings();
 
-  const enabled = settings?.post_process_enabled || false;
+  const enabled = true;
 
   // Settings are guaranteed to have providers after migration
   const providers = settings?.post_process_providers || [];
@@ -67,10 +67,22 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
   const model = settings?.post_process_models?.[selectedProviderId] ?? "";
 
   const providerOptions = useMemo<DropdownOption[]>(() => {
-    return providers.map((provider) => ({
+    const opts = providers.map((provider) => ({
       value: provider.id,
       label: provider.label,
     }));
+    // Add Local Llama if not present (it might not be in the stored settings list yet if we didn't add it to defaults)
+    // But since we want it to be selectable always as a "Feature", we force it here.
+    if (!opts.find(o => o.value === "local_llama")) {
+        const customIndex = opts.findIndex(o => o.value === "custom");
+        const localLlamaOption = { value: "local_llama", label: "Local Llama" };
+        if (customIndex !== -1) {
+            opts.splice(customIndex, 0, localLlamaOption);
+        } else {
+            opts.push(localLlamaOption);
+        }
+    }
+    return opts;
   }, [providers]);
 
   const handleProviderSelect = useCallback(
@@ -84,7 +96,7 @@ export const usePostProcessProviderState = (): PostProcessProviderState => {
 
   const handleBaseUrlChange = useCallback(
     (value: string) => {
-      if (!selectedProvider || selectedProvider.id !== "custom") {
+      if (!selectedProvider || !selectedProvider.allow_base_url_edit) {
         return;
       }
       const trimmed = value.trim();

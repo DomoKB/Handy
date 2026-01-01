@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ToggleSwitch } from "../../ui/ToggleSwitch";
+import Playground from "../../playground/Playground";
 import { RefreshCcw } from "lucide-react";
 import { commands } from "@/bindings";
 
@@ -15,6 +17,7 @@ import { ProviderSelect } from "../PostProcessingSettingsApi/ProviderSelect";
 import { BaseUrlField } from "../PostProcessingSettingsApi/BaseUrlField";
 import { ApiKeyField } from "../PostProcessingSettingsApi/ApiKeyField";
 import { ModelSelect } from "../PostProcessingSettingsApi/ModelSelect";
+import { LocalLlamaSettings } from "../PostProcessingSettingsApi/LocalLlamaSettings";
 import { usePostProcessProviderState } from "../PostProcessingSettingsApi/usePostProcessProviderState";
 import { useSettings } from "../../../hooks/useSettings";
 
@@ -28,20 +31,33 @@ const DisabledNotice: React.FC<{ children: React.ReactNode }> = ({
 
 const PostProcessingSettingsApiComponent: React.FC = () => {
   const { t } = useTranslation();
+  const { getSetting, updateSetting, isUpdating } = useSettings();
   const state = usePostProcessProviderState();
+  const enabled = getSetting("post_process_enabled") || false;
 
-  if (!state.enabled) {
-    return (
-      <DisabledNotice>
-        {t("settings.postProcessing.disabledNotice")}
-      </DisabledNotice>
-    );
-  }
+
 
   return (
     <>
       <SettingContainer
-        title={t("settings.postProcessing.api.provider.title")}
+        title={t("settings.postProcessing.title" /* Add translation later or use literal for now */)}
+        description={t("settings.postProcessing.description")}
+        descriptionMode="inline"
+        layout="horizontal"
+        grouped={true}
+      >
+        <ToggleSwitch
+          checked={enabled}
+          onChange={(val) => updateSetting("post_process_enabled", val)}
+          isUpdating={isUpdating("post_process_enabled")}
+          label={enabled ? t("common.enabled") : t("common.disabled")}
+          description=""
+        />
+      </SettingContainer>
+
+      <div className={enabled ? "" : "opacity-50 pointer-events-none grayscale"}>
+        <SettingContainer
+          title={t("settings.postProcessing.api.provider.title")}
         description={t("settings.postProcessing.api.provider.description")}
         descriptionMode="tooltip"
         layout="horizontal"
@@ -56,7 +72,9 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         </div>
       </SettingContainer>
 
-      {state.isAppleProvider ? (
+      {state.selectedProviderId === "local_llama" ? (
+        <LocalLlamaSettings />
+      ) : state.isAppleProvider ? (
         <SettingContainer
           title={t("settings.postProcessing.api.appleIntelligence.title")}
           description={t(
@@ -72,27 +90,28 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         </SettingContainer>
       ) : (
         <>
-          {state.selectedProvider?.id === "custom" && (
-            <SettingContainer
-              title={t("settings.postProcessing.api.baseUrl.title")}
-              description={t("settings.postProcessing.api.baseUrl.description")}
-              descriptionMode="tooltip"
-              layout="horizontal"
-              grouped={true}
-            >
-              <div className="flex items-center gap-2">
-                <BaseUrlField
-                  value={state.baseUrl}
-                  onBlur={state.handleBaseUrlChange}
-                  placeholder={t(
-                    "settings.postProcessing.api.baseUrl.placeholder",
-                  )}
-                  disabled={state.isBaseUrlUpdating}
-                  className="min-w-[380px]"
-                />
-              </div>
-            </SettingContainer>
-          )}
+          <SettingContainer
+            title={t("settings.postProcessing.api.baseUrl.title")}
+            description={t("settings.postProcessing.api.baseUrl.description")}
+            descriptionMode="tooltip"
+            layout="horizontal"
+            grouped={true}
+          >
+            <div className="flex items-center gap-2">
+              <BaseUrlField
+                value={state.baseUrl}
+                onBlur={state.handleBaseUrlChange}
+                placeholder={t(
+                  "settings.postProcessing.api.baseUrl.placeholder",
+                )}
+                disabled={
+                  !state.selectedProvider?.allow_base_url_edit ||
+                  state.isBaseUrlUpdating
+                }
+                className="min-w-[380px]"
+              />
+            </div>
+          </SettingContainer>
 
           <SettingContainer
             title={t("settings.postProcessing.api.apiKey.title")}
@@ -116,51 +135,54 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         </>
       )}
 
-      <SettingContainer
-        title={t("settings.postProcessing.api.model.title")}
-        description={
-          state.isAppleProvider
-            ? t("settings.postProcessing.api.model.descriptionApple")
-            : state.isCustomProvider
-              ? t("settings.postProcessing.api.model.descriptionCustom")
-              : t("settings.postProcessing.api.model.descriptionDefault")
-        }
-        descriptionMode="tooltip"
-        layout="stacked"
-        grouped={true}
-      >
-        <div className="flex items-center gap-2">
-          <ModelSelect
-            value={state.model}
-            options={state.modelOptions}
-            disabled={state.isModelUpdating}
-            isLoading={state.isFetchingModels}
-            placeholder={
-              state.isAppleProvider
-                ? t("settings.postProcessing.api.model.placeholderApple")
-                : state.modelOptions.length > 0
-                  ? t(
-                      "settings.postProcessing.api.model.placeholderWithOptions",
-                    )
-                  : t("settings.postProcessing.api.model.placeholderNoOptions")
-            }
-            onSelect={state.handleModelSelect}
-            onCreate={state.handleModelCreate}
-            onBlur={() => {}}
-            className="flex-1 min-w-[380px]"
-          />
-          <ResetButton
-            onClick={state.handleRefreshModels}
-            disabled={state.isFetchingModels || state.isAppleProvider}
-            ariaLabel={t("settings.postProcessing.api.model.refreshModels")}
-            className="flex h-10 w-10 items-center justify-center"
-          >
-            <RefreshCcw
-              className={`h-4 w-4 ${state.isFetchingModels ? "animate-spin" : ""}`}
+      {state.selectedProviderId !== "local_llama" && (
+        <SettingContainer
+          title={t("settings.postProcessing.api.model.title")}
+          description={
+            state.isAppleProvider
+              ? t("settings.postProcessing.api.model.descriptionApple")
+              : state.isCustomProvider
+                ? t("settings.postProcessing.api.model.descriptionCustom")
+                : t("settings.postProcessing.api.model.descriptionDefault")
+          }
+          descriptionMode="tooltip"
+          layout="stacked"
+          grouped={true}
+        >
+          <div className="flex items-center gap-2">
+            <ModelSelect
+              value={state.model}
+              options={state.modelOptions}
+              disabled={state.isModelUpdating}
+              isLoading={state.isFetchingModels}
+              placeholder={
+                state.isAppleProvider
+                  ? t("settings.postProcessing.api.model.placeholderApple")
+                  : state.modelOptions.length > 0
+                    ? t(
+                        "settings.postProcessing.api.model.placeholderWithOptions",
+                      )
+                    : t("settings.postProcessing.api.model.placeholderNoOptions")
+              }
+              onSelect={state.handleModelSelect}
+              onCreate={state.handleModelCreate}
+              onBlur={() => {}}
+              className="flex-1 min-w-[380px]"
             />
-          </ResetButton>
-        </div>
-      </SettingContainer>
+            <ResetButton
+              onClick={state.handleRefreshModels}
+              disabled={state.isFetchingModels || state.isAppleProvider}
+              ariaLabel={t("settings.postProcessing.api.model.refreshModels")}
+              className="flex h-10 w-10 items-center justify-center"
+            >
+              <RefreshCcw
+                className={`h-4 w-4 ${state.isFetchingModels ? "animate-spin" : ""}`}
+              />
+            </ResetButton>
+          </div>
+        </SettingContainer>
+      )}
+      </div>
     </>
   );
 };
@@ -173,7 +195,6 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
   const [draftName, setDraftName] = useState("");
   const [draftText, setDraftText] = useState("");
 
-  const enabled = getSetting("post_process_enabled") || false;
   const prompts = getSetting("post_process_prompts") || [];
   const selectedPromptId = getSetting("post_process_selected_prompt_id") || "";
   const selectedPrompt =
@@ -264,13 +285,7 @@ const PostProcessingSettingsPromptsComponent: React.FC = () => {
     setDraftText("");
   };
 
-  if (!enabled) {
-    return (
-      <DisabledNotice>
-        {t("settings.postProcessing.disabledNotice")}
-      </DisabledNotice>
-    );
-  }
+
 
   const hasPrompts = prompts.length > 0;
   const isDirty =
@@ -455,17 +470,62 @@ export const PostProcessingSettingsPrompts = React.memo(
 PostProcessingSettingsPrompts.displayName = "PostProcessingSettingsPrompts";
 
 export const PostProcessingSettings: React.FC = () => {
-  const { t } = useTranslation();
+  const [activeTab, setActiveTab] = useState<"provider" | "prompts" | "playground">("provider");
 
   return (
-    <div className="max-w-3xl w-full mx-auto space-y-6">
-      <SettingsGroup title={t("settings.postProcessing.api.title")}>
-        <PostProcessingSettingsApi />
-      </SettingsGroup>
+    <div className="max-w-3xl w-full mx-auto space-y-6 h-full flex flex-col">
+      <div className="border-b border-mid-gray/20">
+        <div className="flex space-x-6">
+          <button
+            onClick={() => setActiveTab("provider")}
+            className={`pb-2 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === "provider"
+                ? "border-logo-primary text-logo-primary"
+                : "border-transparent text-mid-gray hover:text-text hover:border-mid-gray/30"
+            }`}
+          >
+            Providers
+          </button>
+          <button
+            onClick={() => setActiveTab("prompts")}
+            className={`pb-2 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === "prompts"
+                ? "border-logo-primary text-logo-primary"
+                : "border-transparent text-mid-gray hover:text-text hover:border-mid-gray/30"
+            }`}
+          >
+            Prompts
+          </button>
+          <button
+            onClick={() => setActiveTab("playground")}
+            className={`pb-2 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === "playground"
+                ? "border-logo-primary text-logo-primary"
+                : "border-transparent text-mid-gray hover:text-text hover:border-mid-gray/30"
+            }`}
+          >
+            Playground
+          </button>
+        </div>
+      </div>
 
-      <SettingsGroup title={t("settings.postProcessing.prompts.title")}>
-        <PostProcessingSettingsPrompts />
-      </SettingsGroup>
+      <div className="flex-1 min-h-0">
+        {activeTab === "provider" && (
+          <SettingsGroup title="API (OpenAI Compatible)">
+            <PostProcessingSettingsApi />
+          </SettingsGroup>
+        )}
+        {activeTab === "prompts" && (
+            <SettingsGroup title="Prompts Manager" description="Create and manage your custom prompts.">
+                <PostProcessingSettingsPrompts />
+            </SettingsGroup>
+        )}
+        {activeTab === "playground" && (
+          <div className="h-[calc(100vh-180px)] border border-mid-gray/20 rounded-lg overflow-hidden bg-background">
+            <Playground />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -56,6 +56,7 @@ interface SettingsStore {
   setAudioDevices: (devices: AudioDevice[]) => void;
   setOutputDevices: (devices: AudioDevice[]) => void;
   setCustomSounds: (sounds: { start: boolean; stop: boolean }) => void;
+  setLocalLlamaServerStatus: (status: boolean) => void;
 }
 
 // Note: Default settings are now fetched from Rust via commands.getDefaultSettings()
@@ -137,6 +138,7 @@ export const useSettingsStore = create<SettingsStore>()(
     outputDevices: [],
     customSounds: { start: false, stop: false },
     postProcessModelOptions: {},
+    localLlamaServerStatus: false,
 
     // Internal setters
     setSettings: (settings) => set({ settings }),
@@ -149,6 +151,7 @@ export const useSettingsStore = create<SettingsStore>()(
     setAudioDevices: (audioDevices) => set({ audioDevices }),
     setOutputDevices: (outputDevices) => set({ outputDevices }),
     setCustomSounds: (customSounds) => set({ customSounds }),
+    setLocalLlamaServerStatus: (status) => set({ localLlamaServerStatus: status }),
 
     // Getters
     getSetting: (key) => get().settings?.[key],

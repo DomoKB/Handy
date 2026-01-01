@@ -309,6 +309,20 @@ pub fn run() {
         commands::history::update_history_limit,
         commands::history::update_recording_retention_period,
         helpers::clamshell::is_laptop,
+        commands::chat::send_chat_message,
+        commands::local_llama::download_local_model,
+        commands::local_llama::get_local_model_download_progress,
+        commands::local_llama::cancel_local_model_download,
+        commands::local_llama::get_downloaded_local_models,
+        commands::local_llama::delete_local_model,
+        commands::local_llama::start_local_llama,
+        commands::local_llama::stop_local_llama,
+        commands::local_llama::get_local_llama_server_status,
+        commands::local_llama::get_local_llama_releases,
+        commands::local_llama::download_local_llama,
+        commands::local_llama::open_local_models_folder,
+        commands::local_llama::open_llama_server_folder,
+        commands::local_llama::get_local_llama_installed_version,
     ]);
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds
@@ -359,12 +373,14 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec![]),
         ))
+        .manage(commands::local_llama::LocalLlamaState::default())
         .manage(Mutex::new(ShortcutToggleStates::default()))
         .setup(move |app| {
             let settings = get_settings(&app.handle());

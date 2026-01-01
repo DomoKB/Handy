@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tauri::AppHandle;
 use tauri::Manager;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 // Shortcut Action Trait
 pub trait ShortcutAction: Send + Sync {
@@ -27,6 +28,7 @@ pub trait ShortcutAction: Send + Sync {
 struct TranscribeAction;
 
 async fn maybe_post_process_transcription(
+    app: &AppHandle,
     settings: &AppSettings,
     transcription: &str,
 ) -> Option<String> {
@@ -157,6 +159,16 @@ async fn maybe_post_process_transcription(
                 provider.id,
                 e
             );
+
+            app.dialog()
+                .message(format!(
+                    "Post-processing failed: {}.\n\nFalling back to original transcript.",
+                    e
+                ))
+                .kind(MessageDialogKind::Error)
+                .title("Post-processing Failed")
+                .show(|_| {});
+
             None
         }
     }
@@ -338,7 +350,8 @@ impl ShortcutAction for TranscribeAction {
                             }
                             // Then apply regular post-processing if enabled
                             else if let Some(processed_text) =
-                                maybe_post_process_transcription(&settings, &transcription).await
+                                maybe_post_process_transcription(&ah, &settings, &transcription)
+                                    .await
                             {
                                 final_text = processed_text.clone();
                                 post_processed_text = Some(processed_text);

@@ -1,5 +1,7 @@
 pub mod audio;
+pub mod chat;
 pub mod history;
+pub mod local_llama;
 pub mod models;
 pub mod transcription;
 
