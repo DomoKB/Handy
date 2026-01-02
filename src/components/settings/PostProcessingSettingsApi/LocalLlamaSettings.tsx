@@ -128,7 +128,7 @@ export const LocalLlamaSettings: React.FC = () => {
 
   const checkServerStatus = useCallback(async () => {
     try {
-      const running = await invoke<boolean>("get_local_llama_status");
+      const running = await invoke<boolean>("get_local_llama_server_status");
       setServerStatus(running);
     } catch (e) {
       // ignore
@@ -213,6 +213,13 @@ export const LocalLlamaSettings: React.FC = () => {
   };
 
   const [port, setPort] = useState(8080);
+  
+  // Sync local port state with settings when they load
+  useEffect(() => {
+    if (settings && (settings as any).local_llama_port) {
+      setPort((settings as any).local_llama_port);
+    }
+  }, [settings]);
 
   const handleStartServer = async () => {
     if (!selectedModelPath) return;
@@ -598,6 +605,15 @@ export const LocalLlamaSettings: React.FC = () => {
               />
             </div>
 
+            <Button
+              onClick={fetchLocalModels}
+              variant="secondary"
+              className="w-10 h-9 p-0 flex items-center justify-center shrink-0 mb-[2px]"
+              title="Refresh List"
+            >
+              <RefreshCcw className="w-6 h-6 text-mid-gray" />
+            </Button>
+
             <div className="w-24 space-y-1">
               <label className="text-[10px] font-bold text-mid-gray uppercase tracking-widest pl-1">
                 Port
@@ -605,21 +621,34 @@ export const LocalLlamaSettings: React.FC = () => {
               <Input
                 type="number"
                 value={port}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPort(Number(e.target.value))}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  const val = Number(e.target.value);
+                  setPort(val);
+                  updateSetting("local_llama_port" as any, val);
+                }}
                 className="h-9 w-full font-bold text-center"
                 variant="compact"
                 disabled={serverStatus || isBusy}
               />
             </div>
 
-            <Button
-              onClick={fetchLocalModels}
-              variant="secondary"
-              className="w-10 h-9 p-0 flex items-center justify-center shrink-0"
-              title="Refresh List"
-            >
-              <RefreshCcw className="w-6 h-6 text-mid-gray" />
-            </Button>
+            <div className="space-y-1 flex flex-col justify-end h-full pb-1">
+              <label className="flex items-center gap-2 cursor-pointer group" title="Automatically start server on app launch">
+                <div className="relative flex items-center">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={(settings as any)?.local_llama_auto_start ?? false}
+                    onChange={(e) => updateSetting("local_llama_auto_start" as any, e.target.checked)}
+                    disabled={isBusy}
+                  />
+                  <div className="w-9 h-5 bg-mid-gray/20 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-logo-primary/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-logo-primary peer-disabled:opacity-50"></div>
+                </div>
+                <span className="text-[10px] font-bold text-mid-gray uppercase tracking-widest group-hover:text-mid-gray/80 transition-colors">
+                  Auto-Start
+                </span>
+              </label>
+            </div>
           </div>
         </SettingContainer>
 

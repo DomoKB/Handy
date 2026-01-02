@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import type { AppSettings as Settings, AudioDevice } from "@/bindings";
 import { commands } from "@/bindings";
+import { invoke } from "@tauri-apps/api/core";
 
 interface SettingsStore {
   settings: Settings | null;
@@ -12,6 +13,7 @@ interface SettingsStore {
   outputDevices: AudioDevice[];
   customSounds: { start: boolean; stop: boolean };
   postProcessModelOptions: Record<string, string[]>;
+  localLlamaServerStatus: boolean;
 
   // Actions
   initialize: () => Promise<void>;
@@ -68,9 +70,7 @@ const DEFAULT_AUDIO_DEVICE: AudioDevice = {
   is_default: true,
 };
 
-const settingUpdaters: {
-  [K in keyof Settings]?: (value: Settings[K]) => Promise<unknown>;
-} = {
+const settingUpdaters: Record<string, (value: any) => Promise<unknown>> = {
   always_on_microphone: (value) =>
     commands.updateMicrophoneMode(value as boolean),
   audio_feedback: (value) =>
@@ -126,6 +126,10 @@ const settingUpdaters: {
     commands.changeAppendTrailingSpaceSetting(value as boolean),
   log_level: (value) => commands.setLogLevel(value as any),
   app_language: (value) => commands.changeAppLanguageSetting(value as string),
+  local_llama_auto_start: (value) =>
+    invoke("change_local_llama_auto_start_setting", { enabled: value }),
+  local_llama_port: (value) =>
+    invoke("change_local_llama_port_setting", { port: value }),
 };
 
 export const useSettingsStore = create<SettingsStore>()(

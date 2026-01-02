@@ -301,6 +301,10 @@ pub struct AppSettings {
     pub app_language: String,
     #[serde(default = "default_model_download_links")]
     pub model_download_links: Vec<ModelDownloadLink>,
+    #[serde(default = "default_local_llama_auto_start")]
+    pub local_llama_auto_start: bool,
+    #[serde(default = "default_local_llama_port")]
+    pub local_llama_port: u16,
 }
 
 fn default_model() -> String {
@@ -317,6 +321,14 @@ fn default_translate_to_english() -> bool {
 
 fn default_start_hidden() -> bool {
     false
+}
+
+fn default_local_llama_auto_start() -> bool {
+    false
+}
+
+fn default_local_llama_port() -> u16 {
+    8080
 }
 
 fn default_autostart_enabled() -> bool {
@@ -684,6 +696,8 @@ pub fn get_default_settings() -> AppSettings {
         append_trailing_space: false,
         app_language: default_app_language(),
         model_download_links: default_model_download_links(),
+        local_llama_auto_start: default_local_llama_auto_start(),
+        local_llama_port: default_local_llama_port(),
     }
 }
 

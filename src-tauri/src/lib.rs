@@ -323,6 +323,8 @@ pub fn run() {
         commands::local_llama::open_local_models_folder,
         commands::local_llama::open_llama_server_folder,
         commands::local_llama::get_local_llama_installed_version,
+        commands::local_llama::change_local_llama_auto_start_setting,
+        commands::local_llama::change_local_llama_port_setting,
     ]);
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds
@@ -400,6 +402,51 @@ pub fn run() {
                 }
             }
 
+            // Auto-start Local Llama if enabled
+            if settings.local_llama_auto_start {
+                if let Some(model_name) = settings.post_process_models.get("local_llama") {
+                    if !model_name.is_empty() {
+                        let port = settings.local_llama_port;
+                        let app_handle_clone = app_handle.clone();
+                        let model_name_clone = model_name.clone();
+
+                        tauri::async_runtime::spawn(async move {
+                            if let Some(model_path) =
+                                crate::commands::local_llama::resolve_model_path(
+                                    &app_handle_clone,
+                                    &model_name_clone,
+                                )
+                            {
+                                log::info!(
+                                    "Auto-starting Local Llama server with model: {}",
+                                    model_name_clone
+                                );
+                                match crate::commands::local_llama::start_local_llama(
+                                    app_handle_clone,
+                                    model_path,
+                                    port,
+                                )
+                                .await
+                                {
+                                    Ok(_) => {
+                                        log::info!("Local Llama server auto-started successfully")
+                                    }
+                                    Err(e) => log::error!(
+                                        "Failed to auto-start Local Llama server: {}",
+                                        e
+                                    ),
+                                }
+                            } else {
+                                log::warn!(
+                                    "Auto-start enabled but model file not found: {}",
+                                    model_name_clone
+                                );
+                            }
+                        });
+                    }
+                }
+            }
+
             Ok(())
         })
         .on_window_event(|window, event| match event {
@@ -424,6 +471,28 @@ pub fn run() {
             _ => {}
         })
         .invoke_handler(specta_builder.invoke_handler())
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| match event {
+            tauri::RunEvent::ExitRequested { .. } => {
+                cleanup_local_llama(app.clone());
+            }
+            _ => {}
+        });
+}
+
+fn cleanup_local_llama(app_handle: AppHandle) {
+    let state = app_handle.state::<commands::local_llama::LocalLlamaState>();
+    let mut guard = match state.process.lock() {
+        Ok(g) => g,
+        Err(e) => {
+            log::warn!("Failed to lock Local Llama process mutex: {}", e);
+            return;
+        }
+    };
+
+    if let Some(mut child) = guard.take() {
+        let _ = child.kill();
+        log::info!("Killed Local Llama server on exit");
+    }
 }

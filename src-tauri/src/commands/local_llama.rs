@@ -577,6 +577,25 @@ pub fn get_local_llama_installed_version(app: AppHandle) -> Result<Option<String
         Ok(None)
     }
 }
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_local_llama_auto_start_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.local_llama_auto_start = enabled;
+    write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_local_llama_port_setting(app: AppHandle, port: u16) -> Result<(), String> {
+    let mut settings = get_settings(&app);
+    settings.local_llama_port = port;
+    write_settings(&app, settings);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn get_downloaded_local_models(app: AppHandle) -> Result<Vec<LocalModel>, String> {
@@ -620,6 +639,24 @@ pub fn get_downloaded_local_models(app: AppHandle) -> Result<Vec<LocalModel>, St
     }
 
     Ok(models)
+}
+
+pub fn resolve_model_path(app: &AppHandle, model_name: &str) -> Option<String> {
+    let app_data_dir = app.path().app_data_dir().ok()?;
+    let dirs_to_scan = vec![
+        app_data_dir.join("llama.cpp"),
+        app_data_dir.join("models"),
+        app_data_dir.join("models").join("llama"),
+    ];
+
+    for dir in dirs_to_scan {
+        if let Ok(path) = dir.join(model_name).canonicalize() {
+            if path.exists() && path.is_file() {
+                return Some(path.to_string_lossy().to_string());
+            }
+        }
+    }
+    None
 }
 
 #[tauri::command]
