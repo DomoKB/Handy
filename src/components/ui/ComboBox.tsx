@@ -13,6 +13,7 @@ interface ComboBoxProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  variant?: "default" | "compact";
 }
 
 export const ComboBox: React.FC<ComboBoxProps> = ({
@@ -22,6 +23,7 @@ export const ComboBox: React.FC<ComboBoxProps> = ({
   placeholder,
   className = "",
   disabled = false,
+  variant = "default",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,6 +46,8 @@ export const ComboBox: React.FC<ComboBoxProps> = ({
     setIsOpen(false);
   };
 
+  const paddingClasses = variant === "compact" ? "px-2 py-1" : "px-3 py-2";
+
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       <div className="relative">
@@ -54,7 +58,7 @@ export const ComboBox: React.FC<ComboBoxProps> = ({
           placeholder={placeholder}
           disabled={disabled}
           onClick={() => !disabled && setIsOpen(true)}
-          className={`w-full px-3 py-2 pr-8 text-sm font-semibold bg-mid-gray/10 border border-mid-gray/80 rounded text-left transition-all duration-150 ${
+          className={`w-full ${paddingClasses} pr-8 text-sm font-semibold bg-mid-gray/10 border border-mid-gray/80 rounded text-left transition-all duration-150 ${
             disabled
               ? "opacity-60 cursor-not-allowed bg-mid-gray/10 border-mid-gray/40"
               : "hover:bg-logo-primary/10 hover:border-logo-primary focus:outline-none focus:bg-logo-primary/20 focus:border-logo-primary"

@@ -93,6 +93,12 @@ pub struct LLMPrompt {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Type)]
+pub struct ModelDownloadLink {
+    pub label: String,
+    pub value: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Type)]
 pub struct PostProcessProvider {
     pub id: String,
     pub label: String,
@@ -293,6 +299,8 @@ pub struct AppSettings {
     pub append_trailing_space: bool,
     #[serde(default = "default_app_language")]
     pub app_language: String,
+    #[serde(default = "default_model_download_links")]
+    pub model_download_links: Vec<ModelDownloadLink>,
 }
 
 fn default_model() -> String {
@@ -359,7 +367,7 @@ fn default_sound_theme() -> SoundTheme {
 }
 
 fn default_post_process_enabled() -> bool {
-    false
+    true
 }
 
 fn default_app_language() -> String {
@@ -369,7 +377,7 @@ fn default_app_language() -> String {
 }
 
 fn default_post_process_provider_id() -> String {
-    "openai".to_string()
+    "local_llama".to_string()
 }
 
 fn default_post_process_providers() -> Vec<PostProcessProvider> {
@@ -432,8 +440,8 @@ fn default_post_process_providers() -> Vec<PostProcessProvider> {
         },
         PostProcessProvider {
             id: "custom".to_string(),
-            label: "Custom (OpenAI Specific)".to_string(),
-            base_url: "https://api.openai.com/v1".to_string(),
+            label: "Custom".to_string(),
+            base_url: "http://localhost:8080/v1".to_string(),
             allow_base_url_edit: true,
             models_endpoint: None,
         },
@@ -485,6 +493,23 @@ fn default_post_process_prompts() -> Vec<LLMPrompt> {
         name: "Improve Transcriptions".to_string(),
         prompt: "System Role: You are an expert transcription editor specializing in converting messy speech-to-text data into clear, professional, and readable prose.\n\nTask: Clean up the provided transcript by applying the following rules:\n\nRemove Fillers: Delete all utterances like \"um,\" \"uh,\" \"ah,\" \"like,\" \"you know,\" and \"let's see.\"\n\nHandle Course Corrections: When a speaker corrects themselves mid-sentence (e.g., \"let's meet at 5, no, wait, 6\"), keep only the final intended information.\n\nFix Grammar & Spelling: Correct typos, capitalization, and punctuation while maintaining the speaker’s original tone.\n\nEliminate Redundancy: Remove false starts and repetitive stutters (e.g., \"I, I think that...\").\n\nPreserve Meaning: Do not add new information or change the speaker's core message.\n\nExamples:\n\nInput: \"Andrew, does meeting next week on Thursday at Starbucks actually at Gloria Jeans Coffee work for you at 4 pm? Actually at 2 pm?\"\n\nOutput: \"Andrew, does meeting next week on Thursday at Gloria Jeans Coffee work for you at 2 pm?\"\n\nInput: \"Rebecca, does next week on um, look, lets uh, Wednesday work for you to meet?\"\n\nOutput: \"Rebecca, does next week on Wednesday work for you to meet?\"\n\nInput: \"Adam, how does January 17th, no wait, I mean January 18th work for the kickoff?\"\n\nOutput: \"Adam, how does January 18th work for the kickoff?\"\n\nInput Text to Process:\n\n${output}".to_string(),
     }]
+}
+
+fn default_model_download_links() -> Vec<ModelDownloadLink> {
+    vec![
+        ModelDownloadLink {
+            label: "Qwen 3 4B Instruct (Q4_K_M)".to_string(),
+            value: "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf".to_string(),
+        },
+        ModelDownloadLink {
+            label: "Ministral 3 3B Instruct (Q4_K_M)".to_string(),
+            value: "https://huggingface.co/unsloth/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf".to_string(),
+        },
+        ModelDownloadLink {
+            label: "Llama 3.2 3B Instruct (Q4_K_M)".to_string(),
+            value: "https://huggingface.co/unsloth/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf".to_string(),
+        },
+    ]
 }
 
 fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
@@ -539,6 +564,47 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
                 existing.label = default.label.clone();
                 changed = true;
             }
+        }
+    }
+
+    if settings.model_download_links.is_empty() {
+        settings.model_download_links = default_model_download_links();
+        changed = true;
+    } else {
+        // Migration: Remove Gemma 3n if it exists in existing settings
+        let gemma_3n_url = "https://huggingface.co/unsloth/gemma-3n-E2B-it-GGUF/resolve/main/gemma-3n-E2B-it-Q4_K_M.gguf";
+        let initial_len = settings.model_download_links.len();
+        settings
+            .model_download_links
+            .retain(|l| l.value != gemma_3n_url);
+        if settings.model_download_links.len() != initial_len {
+            changed = true;
+        }
+    }
+
+    // Ensure all default prompts exist
+    for default_prompt in default_post_process_prompts() {
+        if !settings
+            .post_process_prompts
+            .iter()
+            .any(|p| p.id == default_prompt.id)
+        {
+            settings.post_process_prompts.push(default_prompt);
+            changed = true;
+        }
+    }
+
+    // Ensure a prompt is selected if available
+    if settings.post_process_selected_prompt_id.is_none()
+        || settings
+            .post_process_selected_prompt_id
+            .as_ref()
+            .map(|id| id.is_empty())
+            .unwrap_or(false)
+    {
+        if let Some(first_prompt) = settings.post_process_prompts.first() {
+            settings.post_process_selected_prompt_id = Some(first_prompt.id.clone());
+            changed = true;
         }
     }
 
@@ -611,10 +677,13 @@ pub fn get_default_settings() -> AppSettings {
         post_process_api_keys: default_post_process_api_keys(),
         post_process_models: default_post_process_models(),
         post_process_prompts: default_post_process_prompts(),
-        post_process_selected_prompt_id: None,
+        post_process_selected_prompt_id: default_post_process_prompts()
+            .first()
+            .map(|p| p.id.clone()),
         mute_while_recording: false,
         append_trailing_space: false,
         app_language: default_app_language(),
+        model_download_links: default_model_download_links(),
     }
 }
 

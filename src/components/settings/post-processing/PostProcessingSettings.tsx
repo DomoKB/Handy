@@ -41,8 +41,8 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
     <>
       <SettingContainer
         title={t("settings.postProcessing.title" /* Add translation later or use literal for now */)}
-        description={t("settings.postProcessing.description")}
-        descriptionMode="inline"
+        description={t("Automatically refine your transcriptions using an LLM after you stop recording.")}
+        descriptionMode="tooltip"
         layout="horizontal"
         grouped={true}
       >
@@ -50,8 +50,10 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
           checked={enabled}
           onChange={(val) => updateSetting("post_process_enabled", val)}
           isUpdating={isUpdating("post_process_enabled")}
-          label={enabled ? t("common.enabled") : t("common.disabled")}
+          label=""
           description=""
+          descriptionMode="inline"
+          grouped={true}
         />
       </SettingContainer>
 
@@ -90,28 +92,30 @@ const PostProcessingSettingsApiComponent: React.FC = () => {
         </SettingContainer>
       ) : (
         <>
-          <SettingContainer
-            title={t("settings.postProcessing.api.baseUrl.title")}
-            description={t("settings.postProcessing.api.baseUrl.description")}
-            descriptionMode="tooltip"
-            layout="horizontal"
-            grouped={true}
-          >
-            <div className="flex items-center gap-2">
-              <BaseUrlField
-                value={state.baseUrl}
-                onBlur={state.handleBaseUrlChange}
-                placeholder={t(
-                  "settings.postProcessing.api.baseUrl.placeholder",
-                )}
-                disabled={
-                  !state.selectedProvider?.allow_base_url_edit ||
-                  state.isBaseUrlUpdating
-                }
-                className="min-w-[380px]"
-              />
-            </div>
-          </SettingContainer>
+          {state.selectedProviderId === "custom" && (
+            <SettingContainer
+              title={t("settings.postProcessing.api.baseUrl.title")}
+              description={t("settings.postProcessing.api.baseUrl.description")}
+              descriptionMode="tooltip"
+              layout="horizontal"
+              grouped={true}
+            >
+              <div className="flex items-center gap-2">
+                <BaseUrlField
+                  value={state.baseUrl}
+                  onBlur={state.handleBaseUrlChange}
+                  placeholder={t(
+                    "settings.postProcessing.api.baseUrl.placeholder",
+                  )}
+                  disabled={
+                    !state.selectedProvider?.allow_base_url_edit ||
+                    state.isBaseUrlUpdating
+                  }
+                  className="min-w-[380px]"
+                />
+              </div>
+            </SettingContainer>
+          )}
 
           <SettingContainer
             title={t("settings.postProcessing.api.apiKey.title")}

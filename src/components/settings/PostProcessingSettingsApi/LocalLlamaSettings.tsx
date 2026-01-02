@@ -13,6 +13,8 @@ import {
   Square,
   FolderOpen,
   ExternalLink,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useSettings } from "../../../hooks/useSettings";
 import { listen } from "@tauri-apps/api/event";
@@ -35,28 +37,13 @@ interface LocalModel {
   size: number;
 }
 
-const SUGGESTED_MODELS = [
-  {
-    label: "Llama 3.2 3B Instruct 2.02 GB ",
-    value:
-      "https://huggingface.co/unsloth/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
-  },
-  {
-    label: "Qwen3 4B Instruct 2.5 GB",
-    value:
-      "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
-  },
-  {
-    label: "Ministral 3 3B Instruct 2.15 GB",
-    value:
-      "https://huggingface.co/mistralai/Ministral-3-3B-Instruct-2512-GGUF/resolve/main/Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
-  },
-];
+
 
 export const LocalLlamaSettings: React.FC = () => {
   const {
     settings,
     refreshSettings,
+    updateSetting,
     localLlamaServerStatus,
     setLocalLlamaServerStatus,
   } = useSettings();
@@ -354,54 +341,90 @@ export const LocalLlamaSettings: React.FC = () => {
     }
   };
 
+  const handleAddModelLink = () => {
+    if (!modelUrl) return;
+    const label = modelUrl.split("/").pop() || modelUrl;
+    const currentLinks = settings?.model_download_links || [];
+    if (currentLinks.some((l: any) => l.value === modelUrl)) return;
+
+    const newLinks = [...currentLinks, { label, value: modelUrl }];
+    updateSetting("model_download_links", newLinks);
+  };
+
+  const handleRemoveModelLink = (value: string) => {
+    const currentLinks = settings?.model_download_links || [];
+    const newLinks = currentLinks.filter((l: any) => l.value !== value);
+    updateSetting("model_download_links", newLinks);
+  };
+
+  const modelDownloadOptions = useMemo(() => {
+    return (settings?.model_download_links || []).map((l: any) => ({
+      label: l.label,
+      value: l.value,
+    }));
+  }, [settings?.model_download_links]);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <SettingContainer
         title="Llama Server Manager"
         description="Download and manage the Local Llama server."
         layout="stacked"
       >
-        <div className="space-y-4">
-          <div className="grid grid-cols-[1fr_2fr] gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-500 uppercase">
-                Release
+        <div className="space-y-3">
+          {/* Step 1: Release Selection */}
+          <div className="space-y-2 p-3 bg-mid-gray/5 rounded-lg border border-mid-gray/10">
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-[10px] font-bold text-mid-gray uppercase tracking-widest pl-1">
+                Step 1: Select Release
               </label>
-              <div className="flex gap-2 items-center">
-                <Dropdown
-                  options={releases.map((r) => ({
-                    value: r.tag_name,
-                    label: r.tag_name,
-                  }))}
-                  selectedValue={selectedReleaseTag}
-                  onSelect={setSelectedReleaseTag}
-                  placeholder="Select Release"
-                  className="flex-1"
-                />
-                <Button
-                  variant="secondary"
-                  onClick={fetchReleases}
-                  className="w-10 h-10 p-0 flex items-center justify-center shrink-0"
-                >
-                  <RefreshCcw className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() =>
-                    openUrl("https://github.com/ggml-org/llama.cpp/releases")
-                  }
-                  className="w-10 h-10 p-0 flex items-center justify-center shrink-0"
-                  title="View All Releases"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </Button>
-              </div>
             </div>
+            <div className="flex gap-2 items-center">
+              <Dropdown
+                options={releases.map((r) => ({
+                  value: r.tag_name,
+                  label: r.tag_name,
+                }))}
+                selectedValue={selectedReleaseTag}
+                onSelect={setSelectedReleaseTag}
+                placeholder="Select Release"
+                className="flex-1"
+              />
+              {isInstalled && (
+                <div className="h-9 px-3 flex items-center justify-center bg-green-500/10 text-green-600 text-[10px] font-black border border-green-500/20 rounded-lg whitespace-nowrap shadow-sm">
+                  V{installedVersion}
+                </div>
+              )}
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  await fetchReleases();
+                  await checkInstalledVersion();
+                }}
+                className="w-10 h-9 p-0 flex items-center justify-center shrink-0"
+                title="Refresh Releases & Status"
+              >
+                <RefreshCcw className="w-6 h-6 text-mid-gray" />
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  openUrl("https://github.com/ggml-org/llama.cpp/releases")
+                }
+                className="w-10 h-9 p-0 flex items-center justify-center shrink-0"
+                title="View on GitHub"
+              >
+                <ExternalLink className="w-6 h-6 text-mid-gray" />
+              </Button>
+            </div>
+          </div>
 
+          {/* Step 2: Architecture selection and Installation */}
+          <div className="space-y-2 p-3 bg-mid-gray/5 rounded-lg border border-mid-gray/10">
+            <label className="text-[10px] font-bold text-mid-gray uppercase tracking-widest pl-1 mb-1 block">
+              Step 2: Architecture & Setup
+            </label>
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-500 uppercase">
-                Version (Asset)
-              </label>
               <div className="flex gap-2 items-center">
                 <Dropdown
                   options={windowsAssets.map((a) => ({
@@ -413,7 +436,7 @@ export const LocalLlamaSettings: React.FC = () => {
                   placeholder={
                     windowsAssets.length === 0
                       ? "No assets found"
-                      : "Select Version"
+                      : "Choose Architecture"
                   }
                   className="flex-1"
                   disabled={windowsAssets.length === 0}
@@ -422,159 +445,142 @@ export const LocalLlamaSettings: React.FC = () => {
                   variant="primary"
                   onClick={handleDownload}
                   disabled={isDownloading || !selectedAssetUrl}
-                  className="h-10 px-4 flex items-center justify-center whitespace-nowrap shrink-0"
+                  className="px-4 h-9 flex items-center justify-center text-xs font-bold shadow-sm shrink-0"
                 >
-                  <Download className="w-4 h-4 mr-2" />
-                  {isInstalled ? "Re-Install" : "Download"}
+                  <Download className="w-5 h-5 mr-1.5" />
+                  {isInstalled ? "Re-Install" : "Setup Server"}
                 </Button>
               </div>
-            </div>
-          </div>
 
-          {(isDownloading || downloadStatus) && (
-            <div className="space-y-1">
-              <div className="h-2 bg-gray-200 rounded overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${downloadProgress}%` }}
-                />
-              </div>
-              <p className="text-xs text-gray-500 flex justify-start gap-2">
-                <span>{downloadStatus}</span>
-                {downloadSpeed && <span>- {downloadSpeed}</span>}
-              </p>
-            </div>
-          )}
-
-          <div className="flex justify-between items-center text-xs text-gray-400">
-            <div className="flex gap-4 items-center">
-              {isInstalled && (
-                <span className="text-green-600">
-                  Installed Version: {installedVersion}
-                </span>
+              {(isDownloading || downloadStatus) && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-logo-primary transition-all duration-300"
+                      style={{ width: `${downloadProgress}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] font-bold text-mid-gray uppercase">
+                    <span>{downloadStatus} {downloadProgress > 0 && downloadProgress < 100 ? `(${downloadProgress.toFixed(1)}%)` : ""}</span>
+                    {downloadSpeed && <span>{downloadSpeed}</span>}
+                  </div>
+                </div>
               )}
+
+              <div className="flex justify-end px-1">
+                <button
+                  onClick={handleOpenServerFolder}
+                  className="flex items-center gap-1.5 text-[10px] font-medium text-mid-gray/50 hover:text-logo-primary transition-colors"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  Manage Server Files
+                </button>
+              </div>
             </div>
-            <button
-              onClick={handleOpenServerFolder}
-              className="flex items-center gap-1 hover:text-gray-600 transition-colors"
-              title="Open Server Folder"
-            >
-              <FolderOpen className="w-3 h-3" />
-              Open Folder
-            </button>
           </div>
         </div>
       </SettingContainer>
 
       <SettingContainer
         title="Model Download"
-        description="Download .gguf models directly from Hugging Face."
+        description="Get models from Hugging Face."
         layout="stacked"
         descriptionMode="tooltip"
       >
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <ComboBox
-                value={modelUrl}
-                onChange={setModelUrl}
-                options={SUGGESTED_MODELS}
-                placeholder="https://huggingface.co/.../model.gguf or Select Model"
-                className="flex-1"
-                disabled={isModelDownloading}
-              />
+        <div className="space-y-2 pt-1">
+          <div className="flex gap-2">
+            <ComboBox
+              value={modelUrl}
+              onChange={setModelUrl}
+              options={modelDownloadOptions}
+              placeholder="Model URL or Select"
+              className="flex-1 font-medium"
+              disabled={isModelDownloading}
+              variant="compact"
+            />
+            <Button
+              variant="secondary"
+              onClick={handleAddModelLink}
+              disabled={!modelUrl || isModelDownloading}
+              className="w-10 h-9 p-0 flex items-center justify-center shrink-0"
+              title="Add to list"
+            >
+              <Plus className="w-6 h-6" />
+            </Button>
+            {modelDownloadOptions.some((o: any) => o.value === modelUrl) && (
               <Button
-                variant="primary"
-                onClick={handleDownloadModel}
-                disabled={isModelDownloading || !modelUrl}
+                variant="secondary"
+                onClick={() => handleRemoveModelLink(modelUrl)}
+                disabled={isModelDownloading}
+                className="w-10 h-9 p-0 flex items-center justify-center shrink-0 text-red-500 hover:text-red-700"
+                title="Remove from list"
               >
-                {isModelDownloading ? "Downloading..." : "Download"}
+                <Trash2 className="w-6 h-6" />
               </Button>
-            </div>
+            )}
+            <Button
+              variant="primary"
+              onClick={handleDownloadModel}
+              disabled={isModelDownloading || !modelUrl}
+              className="px-4 h-9 flex items-center justify-center shrink-0 text-xs font-bold shadow-sm"
+            >
+              {isModelDownloading ? "Starting..." : "Download"}
+            </Button>
+          </div>
 
-            {/* Progress Bar */}
-            {isModelDownloading && (
-              <div className="space-y-1">
-                <div className="h-2 bg-gray-200 rounded overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 transition-all duration-300"
-                    style={{ width: `${downloadProgress}%` }}
-                  />
-                </div>
-                <p className="text-xs text-center text-gray-500">
-                  {downloadProgress.toFixed(1)}%{" "}
-                  {downloadSpeed && `- ${downloadSpeed}`}
-                </p>
+          {isModelDownloading && (
+            <div className="space-y-1.5">
+              <div className="h-1.5 bg-mid-gray/20 rounded-full overflow-hidden">
+                <div className="h-full bg-logo-primary" style={{ width: `${downloadProgress}%` }} />
               </div>
-            )}
-
-            {modelDownloadStatus && (
-              <p
-                className={`text-xs ${modelDownloadStatus.includes("Error") ? "text-red-500" : "text-green-500"}`}
-              >
-                {modelDownloadStatus}
-              </p>
-            )}
-
-            <div className="flex justify-between items-center text-xs text-gray-400">
-              <p>
-                Place .gguf files in the <code>models/llama</code> folder.
-              </p>
-              <button
-                onClick={handleOpenFolder}
-                className="flex items-center gap-1 hover:text-gray-600 transition-colors"
-                title="Open Models Folder"
-              >
-                <FolderOpen className="w-3 h-3" />
-                Open Folder
-              </button>
+              <div className="flex justify-between text-[10px] font-bold text-mid-gray uppercase">
+                <span>{downloadProgress.toFixed(1)}%</span>
+                {downloadSpeed && <span>{downloadSpeed}</span>}
+              </div>
             </div>
+          )}
+
+          <div className="flex justify-between items-center text-[10px] font-medium text-mid-gray/50 px-1">
+            <p>Files in: <code>models/llama</code></p>
+            <button
+              onClick={handleOpenFolder}
+              className="flex items-center gap-1.5 hover:text-logo-primary transition-colors"
+            >
+              <FolderOpen className="w-4 h-4" />
+              Manage Models
+            </button>
           </div>
         </div>
       </SettingContainer>
 
-      <SettingContainer
-        title="Server Configuration"
-        description="Select the local model to load and the port to run the server on."
-        layout="stacked"
-        descriptionMode="tooltip"
-      >
-        <div className="grid grid-cols-[1fr_120px] gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Select Local Model</label>
-            <div className="flex gap-2 items-center">
+      <div className="space-y-3">
+        <SettingContainer
+          title="Server Configuration"
+          description="Select model and port."
+          layout="stacked"
+          descriptionMode="tooltip"
+        >
+          <div className="flex gap-2 items-end">
+            <div className="flex-[2] space-y-1">
+              <label className="text-[10px] font-bold text-mid-gray uppercase tracking-widest pl-1">
+                Local Model
+              </label>
               <Dropdown
                 options={localModels.map((m) => ({
                   value: m.path,
-                  label: `${m.name} (${(m.size / 1024 / 1024).toFixed(1)} MB)`,
+                  label: `${m.name} (${(m.size / 1024 / 1024).toFixed(0)} MB)`,
                 }))}
                 selectedValue={selectedModelPath}
                 onSelect={async (newPath) => {
                   if (newPath === selectedModelPath) return;
-
                   if (serverStatus) {
-                    // Auto-restart flow
                     try {
                       setActionStatus("restarting");
-                      // 1. Update state immediately so UI reflects target
                       setSelectedModelPath(newPath);
-
-                      // 2. Stop valid server
-                      // Note: we kept serverStatus=true initially to show "Restarting..." (isLoading=true + serverStatus=true)
                       await invoke("stop_local_llama");
-
-                      // 3. Start new server
-                      // Small delay to ensure port release if needed
                       await new Promise((r) => setTimeout(r, 500));
-                      await invoke("start_local_llama", {
-                        modelPath: newPath,
-                        port: port,
-                      });
-
-                      // Refresh settings so the frontend knows about the new active provider/model
+                      await invoke("start_local_llama", { modelPath: newPath, port: port });
                       await refreshSettings();
-
-                      // Ensure status is true at end
                       setServerStatus(true);
                     } catch (e) {
                       console.error("Failed to auto-restart:", e);
@@ -583,94 +589,76 @@ export const LocalLlamaSettings: React.FC = () => {
                       setActionStatus("idle");
                     }
                   } else {
-                    // Simple switch
                     setSelectedModelPath(newPath);
                   }
                 }}
-                placeholder="Select a Model"
-                className="flex-1"
+                placeholder="Select"
+                className="w-full"
                 disabled={isBusy}
               />
-              <Button
-                onClick={fetchLocalModels}
-                variant="secondary"
-                className="w-10 h-10 p-0 flex items-center justify-center shrink-0"
-              >
-                <RefreshCcw className="w-4 h-4" />
-              </Button>
+            </div>
+
+            <div className="w-24 space-y-1">
+              <label className="text-[10px] font-bold text-mid-gray uppercase tracking-widest pl-1">
+                Port
+              </label>
+              <Input
+                type="number"
+                value={port}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPort(Number(e.target.value))}
+                className="h-9 w-full font-bold text-center"
+                variant="compact"
+                disabled={serverStatus || isBusy}
+              />
+            </div>
+
+            <Button
+              onClick={fetchLocalModels}
+              variant="secondary"
+              className="w-10 h-9 p-0 flex items-center justify-center shrink-0"
+              title="Refresh List"
+            >
+              <RefreshCcw className="w-6 h-6 text-mid-gray" />
+            </Button>
+          </div>
+        </SettingContainer>
+
+        <div className="flex gap-2 items-stretch h-12">
+          <Button
+            variant={serverStatus ? "secondary" : "primary"}
+            onClick={serverStatus ? handleStopServer : handleStartServer}
+            disabled={isBusy || (!serverStatus && (!isInstalled || !selectedModelPath))}
+            className="flex-1 h-full text-xs font-bold flex items-center justify-center shadow-sm"
+          >
+            {actionStatus === "restarting" ? (
+              <><RefreshCcw className="w-5 h-5 mr-2 animate-spin" />Restarting</>
+            ) : actionStatus === "starting" ? (
+              <><Play className="w-5 h-5 mr-2 fill-current" />Starting</>
+            ) : actionStatus === "stopping" ? (
+              <><Square className="w-5 h-5 mr-2 fill-current" />Stopping</>
+            ) : serverStatus ? (
+              <><Square className="w-5 h-5 mr-2 fill-current" />Stop Server</>
+            ) : (
+              <><Play className="w-5 h-5 mr-2 fill-current" />Start Server</>
+            )}
+          </Button>
+
+          <div
+            className={`px-4 flex items-center justify-center border rounded-lg text-center transition-all duration-300 min-w-[120px] ${
+              isBusy
+                ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-600"
+                : serverStatus
+                  ? "bg-green-500/10 border-green-500/20 text-green-600"
+                  : "bg-mid-gray/5 border-mid-gray/10 text-mid-gray"
+            }`}
+          >
+            <div className="flex flex-col items-center">
+              <span className="text-[9px] font-bold uppercase tracking-thicker opacity-60 leading-none mb-0.5">Status</span>
+              <span className="text-[11px] font-black uppercase tracking-wider leading-none">
+                {serverStatus ? `Live: ${port}` : "Offline"}
+              </span>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Port</label>
-            <Input
-              type="number"
-              value={port}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setPort(Number(e.target.value))
-              }
-              className="w-full"
-              disabled={serverStatus || isBusy}
-            />
-          </div>
-        </div>
-      </SettingContainer>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Button
-          variant={serverStatus ? "secondary" : "primary"}
-          onClick={serverStatus ? handleStopServer : handleStartServer}
-          disabled={isBusy || (!serverStatus && !selectedModelPath)}
-          className="h-12 text-lg flex items-center justify-center"
-        >
-          {actionStatus === "restarting" ? (
-            <>
-              <RefreshCcw className="w-5 h-5 mr-2 animate-spin" />
-              Restarting Server...
-            </>
-          ) : actionStatus === "starting" ? (
-            <>
-              <Play className="w-5 h-5 mr-2 fill-current" />
-              Starting...
-            </>
-          ) : actionStatus === "stopping" ? (
-            <>
-              <Square className="w-5 h-5 mr-2 fill-current" />
-              Stopping...
-            </>
-          ) : serverStatus ? (
-            <>
-              <Square className="w-5 h-5 mr-2 fill-current" />
-              Stop Server
-            </>
-          ) : (
-            <>
-              <Play className="w-5 h-5 mr-2 fill-current" />
-              Start Server
-            </>
-          )}
-        </Button>
-
-        <div
-          className={`h-12 flex items-center justify-center px-3 border rounded text-center ${
-            isBusy
-              ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-600"
-              : serverStatus
-                ? "bg-green-500/10 border-green-500/20 text-green-600"
-                : "bg-gray-500/10 border-gray-500/20 text-gray-500"
-          }`}
-        >
-          <span className="text-sm font-medium">
-            {actionStatus === "restarting"
-              ? "Server is restarting..."
-              : actionStatus === "starting"
-                ? "Server is starting..."
-                : actionStatus === "stopping"
-                  ? "Server is stopping..."
-                  : serverStatus
-                    ? `Server is running on port ${port}`
-                    : "Server is stopped"}
-          </span>
         </div>
       </div>
     </div>
